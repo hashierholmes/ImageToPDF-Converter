@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to PDF Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-blue': '#4A9EFF',
+                        'light-blue': '#87CEEB',
+                        'soft-gray': '#F8F9FA'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gradient-to-br from-soft-gray to-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="text-center mb-12">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-primary-blue rounded-2xl mb-4">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+            </div>
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Image to PDF Converter</h1>
+            <p class="text-gray-600 text-lg">Convert up to 20 images into a perfectly formatted PDF</p>
+        </header>
+
+        <!-- Upload Section -->
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white rounded-3xl shadow-xl p-8 mb-8">
+                <div class="border-2 border-dashed border-primary-blue rounded-2xl p-12 text-center hover:border-light-blue transition-colors duration-300" id="dropZone">
+                    <div class="mb-6">
+                        <svg class="w-16 h-16 text-primary-blue mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-2">Drop your images here</h3>
+                        <p class="text-gray-600 mb-4">or click to browse files</p>
+                        <p class="text-sm text-gray-500">Maximum 20 images • JPG, PNG, GIF supported</p>
+                    </div>
+                    <input type="file" id="imageInput" multiple accept="image/*" class="hidden">
+                    <button onclick="document.getElementById('imageInput').click()" class="bg-primary-blue hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-xl transition-colors duration-300">
+                        Choose Images
+                    </button>
+                </div>
+            </div>
+
+            <!-- Image Preview Section -->
+            <div id="imagePreview" class="hidden bg-white rounded-3xl shadow-xl p-8 mb-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-semibold text-gray-800">Selected Images</h3>
+                    <span id="imageCount" class="bg-primary-blue text-white px-4 py-2 rounded-full text-sm font-medium">0/20</span>
+                </div>
+                <div id="imageGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6"></div>
+                <div class="flex gap-4 justify-center">
+                    <button onclick="clearImages()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-xl transition-colors duration-300">
+                        Clear All
+                    </button>
+                    <button onclick="generatePDF()" class="bg-primary-blue hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-xl transition-colors duration-300">
+                        Generate PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Section -->
+            <div id="loadingSection" class="hidden bg-white rounded-3xl shadow-xl p-8 text-center">
+                <div class="animate-spin w-12 h-12 border-4 border-primary-blue border-t-transparent rounded-full mx-auto mb-4"></div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">Generating PDF...</h3>
+                <p class="text-gray-600">Please wait while we process your images</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Added footer with credits -->
+    <footer class="bg-white border-t border-gray-200 py-8 mt-16">
+        <div class="container mx-auto px-4 text-center">
+            <div class="flex flex-col md:flex-row items-center justify-center gap-4 text-gray-600">
+                <p class="flex items-center gap-2">
+                    Made with 💙 <span class="font-semibold text-primary-blue">Hashier Holmes</span>
+                </p>
+                <span class="hidden md:block text-gray-400">•</span>
+                <p class="flex items-center gap-2">
+                    Powered by <span class="font-semibold text-primary-blue">jsPDF</span>
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        let selectedImages = [];
+        const maxImages = 20;
+        let draggedIndex = null;
+
+        // Initialize drag and drop
+        const dropZone = document.getElementById('dropZone');
+        const imageInput = document.getElementById('imageInput');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-light-blue', 'bg-blue-50');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-light-blue', 'bg-blue-50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-light-blue', 'bg-blue-50');
+            const files = Array.from(e.dataTransfer.files);
+            handleFiles(files);
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        });
+
+        function handleFiles(files) {
+            const imageFiles = files.filter(file => file.type.startsWith('image/'));
+            
+            if (selectedImages.length + imageFiles.length > maxImages) {
+                alert(`You can only select up to ${maxImages} images. Currently selected: ${selectedImages.length}`);
+                return;
+            }
+
+            imageFiles.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    selectedImages.push({
+                        file: file,
+                        dataUrl: e.target.result,
+                        name: file.name
+                    });
+                    updateImagePreview();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function updateImagePreview() {
+            const previewSection = document.getElementById('imagePreview');
+            const imageGrid = document.getElementById('imageGrid');
+            const imageCount = document.getElementById('imageCount');
+
+            if (selectedImages.length === 0) {
+                previewSection.classList.add('hidden');
+                return;
+            }
+
+            previewSection.classList.remove('hidden');
+            imageCount.textContent = `${selectedImages.length}/${maxImages}`;
+
+            imageGrid.innerHTML = selectedImages.map((img, index) => `
+                <div class="relative group cursor-move" 
+                     draggable="true" 
+                     data-index="${index}"
+                     ondragstart="handleDragStart(event, ${index})"
+                     ondragover="handleDragOver(event)"
+                     ondrop="handleDrop(event, ${index})"
+                     ondragend="handleDragEnd(event)">
+                    <img src="${img.dataUrl}" alt="${img.name}" class="w-full h-24 object-cover rounded-lg shadow-md transition-all duration-200">
+                    <button onclick="removeImage(${index})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                        ×
+                    </button>
+                    <p class="text-xs text-gray-600 mt-1 truncate">${img.name}</p>
+                    <div class="absolute inset-0 bg-primary-blue bg-opacity-20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-primary-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                        </svg>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function removeImage(index) {
+            selectedImages.splice(index, 1);
+            updateImagePreview();
+        }
+
+        function clearImages() {
+            selectedImages = [];
+            updateImagePreview();
+            imageInput.value = '';
+        }
+
+        async function generatePDF() {
+            if (selectedImages.length === 0) {
+                alert('Please select at least one image');
+                return;
+            }
+
+            const loadingSection = document.getElementById('loadingSection');
+            const imagePreview = document.getElementById('imagePreview');
+            
+            imagePreview.classList.add('hidden');
+            loadingSection.classList.remove('hidden');
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+                
+                // A4 dimensions in mm
+                const pageWidth = 210;
+                const pageHeight = 297;
+                const margin = 20;
+                const maxWidth = pageWidth - (margin * 2);
+                const maxHeight = pageHeight - (margin * 2);
+
+                for (let i = 0; i < selectedImages.length; i++) {
+                    if (i > 0) {
+                        pdf.addPage();
+                    }
+
+                    const img = selectedImages[i];
+                    
+                    // Create a temporary image to get dimensions
+                    const tempImg = new Image();
+                    await new Promise((resolve) => {
+                        tempImg.onload = resolve;
+                        tempImg.src = img.dataUrl;
+                    });
+
+                    // Calculate aspect ratio and fit within page
+                    const aspectRatio = tempImg.width / tempImg.height;
+                    let imgWidth, imgHeight;
+
+                    if (aspectRatio > maxWidth / maxHeight) {
+                        // Image is wider, fit to width
+                        imgWidth = maxWidth;
+                        imgHeight = maxWidth / aspectRatio;
+                    } else {
+                        // Image is taller, fit to height
+                        imgHeight = maxHeight;
+                        imgWidth = maxHeight * aspectRatio;
+                    }
+
+                    // Center the image on the page
+                    const x = (pageWidth - imgWidth) / 2;
+                    const y = (pageHeight - imgHeight) / 2;
+
+                    pdf.addImage(img.dataUrl, 'JPEG', x, y, imgWidth, imgHeight);
+                }
+
+                // Save the PDF
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                pdf.save(`images-to-pdf-${timestamp}.pdf`);
+
+            } catch (error) {
+                console.error('Error generating PDF:', error);
+                alert('Error generating PDF. Please try again.');
+            } finally {
+                loadingSection.classList.add('hidden');
+                imagePreview.classList.remove('hidden');
+            }
+        }
+
+        function handleDragStart(event, index) {
+            draggedIndex = index;
+            event.target.style.opacity = '0.5';
+            event.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            event.currentTarget.style.transform = 'scale(1.05)';
+            event.currentTarget.style.boxShadow = '0 8px 25px rgba(74, 158, 255, 0.3)';
+        }
+
+        function handleDrop(event, dropIndex) {
+            event.preventDefault();
+            event.currentTarget.style.transform = '';
+            event.currentTarget.style.boxShadow = '';
+            
+            if (draggedIndex !== null && draggedIndex !== dropIndex) {
+                // Reorder the images array
+                const draggedImage = selectedImages[draggedIndex];
+                selectedImages.splice(draggedIndex, 1);
+                selectedImages.splice(dropIndex, 0, draggedImage);
+                updateImagePreview();
+            }
+        }
+
+        function handleDragEnd(event) {
+            event.target.style.opacity = '';
+            event.target.style.transform = '';
+            event.target.style.boxShadow = '';
+            draggedIndex = null;
+            
+            // Reset all elements that might have hover effects
+            const allItems = document.querySelectorAll('[draggable="true"]');
+            allItems.forEach(item => {
+                item.style.transform = '';
+                item.style.boxShadow = '';
+            });
+        }
+    </script>
+</body>
+</html>
